@@ -1,6 +1,4 @@
 package name.modid.mixin;
-import net.minecraft.entity.decoration.DisplayEntity;
-import net.minecraft.entity.decoration.DisplayEntity.BlockDisplayEntity;
 import net.minecraft.entity.decoration.ArmorStandEntity;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.entity.Entity;
@@ -11,7 +9,6 @@ import net.minecraft.nbt.NbtCompound;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
@@ -23,14 +20,10 @@ import net.minecraft.world.Heightmap;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.ChunkStatus;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-
-import com.mojang.brigadier.context.CommandContext;
 
 import org.spongepowered.asm.mixin.Shadow;
 
@@ -39,7 +32,6 @@ import name.modid.Ivolegendarios;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 @Mixin(Entity.class)
@@ -125,9 +117,6 @@ public abstract class BlockDisplayMixin {
 	    	BlockPos blockPos = new BlockPos((int) Ivolegendarios.COORDS_SPAWN[0], (int) 319, (int) Ivolegendarios.COORDS_SPAWN[2]);
 		    int chunkX = MathHelper.floor(Ivolegendarios.COORDS_SPAWN[0]) >> 4;
 		    int chunkZ = MathHelper.floor(Ivolegendarios.COORDS_SPAWN[2]) >> 4;
-		    player.getServer().getOverworld().getChunkManager().getChunk(chunkX, chunkZ, ChunkStatus.FULL, true);
-			int groundLevelY = Objects.requireNonNull(player.getServer().getOverworld()).getTopPosition(Heightmap.Type.WORLD_SURFACE, blockPos).getY();
-		    player.getServer().getOverworld().getChunkManager().getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
 	        String tp="execute in server:void run execute positioned "+Ivolegendarios.COORDS_ISLA[0]+" "+Ivolegendarios.COORDS_ISLA[1]+" "+Ivolegendarios.COORDS_ISLA[2]+" run execute as @a[distance=..100] run execute in minecraft:overworld run tp @s "+this.lastX+" "+(this.lastY-25)+" "+this.lastZ;
 	        String kill="execute in server:void run execute positioned "+Ivolegendarios.COORDS_SPAWN[0]+" "+Ivolegendarios.COORDS_SPAWN[1]+" "+Ivolegendarios.COORDS_SPAWN[2]+" run tp @e[type=cobblemon:pokemon,distance=..100] ~ ~-100 ~";
 	        String objAdd="scoreboard objectives add jugadorPortalLegendarios dummy";
@@ -137,7 +126,7 @@ public abstract class BlockDisplayMixin {
 			RegistryKey<World> voidWorldKey = RegistryKey.of(RegistryKeys.WORLD, Identifier.of("server", "void"));
 			World voidWorld = player.getServer().getWorld(voidWorldKey);
 			if (voidWorld == null) {
-				Ivolegendarios.LOGGER.info("ES NULL");
+				Ivolegendarios.LOGGER.info("VOIDWORLD ES NULL");
 			}
 			voidWorld.getChunkManager().getChunk(chunkX, chunkZ, ChunkStatus.FULL, true);
 	        bossBar.clearPlayers();
@@ -147,8 +136,10 @@ public abstract class BlockDisplayMixin {
 	        player.getServer().getCommandManager().executeWithPrefix(player.getServer().getCommandSource(), borrarStand);
 	        player.getServer().getCommandManager().executeWithPrefix(player.getServer().getCommandSource(), borrar);
 	        player.getServer().getCommandManager().executeWithPrefix(player.getServer().getCommandSource(), tp);
-
-
+		    Ivolegendarios.LOGGER.info(player.getName().getLiteralString()+"ESTÁ SALIENDO DE ISLALEGEN. MATANDO POKEMON...");
+		    int chunkXOw = MathHelper.floor(this.lastX)>> 4;
+		    int chunkZOw = MathHelper.floor(this.lastZ) >> 4;		    
+		    player.getServer().getOverworld().getChunkManager().getChunk(chunkXOw, chunkZOw, ChunkStatus.FULL, false);
 	        setDentro(false);
             if (Ivolegendarios.scheduler != null && !Ivolegendarios.scheduler.isShutdown()) {
     	    	Ivolegendarios.scheduler.shutdownNow();
@@ -187,9 +178,8 @@ public abstract class BlockDisplayMixin {
 	private void showBossBar(PlayerEntity player) {
 	    ServerPlayerEntity serverPlayer = (ServerPlayerEntity) player;
 	    // 10 minutos = 600 segundos = 600*20 ticks
-	    int TOTAL_TICKS = 600 * 20;
-	    final int[] tickCount = {0}; // Contenedor mutable
-
+	    int TOTAL_SECONDS = 600;
+	    int[] ELAPSED_SECONDS= {0};
 	    bossBar = new ServerBossBar(
 	            Text.literal("Tiempo restante"),
 	            BossBar.Color.RED,
@@ -200,18 +190,19 @@ public abstract class BlockDisplayMixin {
 	    if (serverPlayer != null) {
 	        bossBar.addPlayer(serverPlayer);
 	    }
-
-	    ServerTickEvents.END_SERVER_TICK.register((MinecraftServer server) -> {
-	    	if(dentro) {
-		        tickCount[0]++;
-		        float progress = 1.0f - ((float) tickCount[0] / TOTAL_TICKS);
-		        bossBar.setPercent(progress);
-		        if (tickCount[0] >= TOTAL_TICKS) {
-		            bossBar.removePlayer(serverPlayer);
-		            tickCount[0] = 0;
-		        }
-	    	}
-	    });
+	    while(ELAPSED_SECONDS[0]< TOTAL_SECONDS) {
+	    	Ivolegendarios.scheduler.schedule(() -> {
+	    		if(dentro) {
+	    			float progress = 1.0f - ((float) ELAPSED_SECONDS[0]/ TOTAL_SECONDS);
+	    			bossBar.setPercent(progress);
+	
+	    		}
+	    	}, ELAPSED_SECONDS[0], TimeUnit.SECONDS);
+	    	ELAPSED_SECONDS[0]+=10;
+	        if (ELAPSED_SECONDS[0]>= TOTAL_SECONDS) {
+	            bossBar.removePlayer(serverPlayer);
+	        }
+	    }
 	}
 
     private static synchronized boolean isDentro() {
