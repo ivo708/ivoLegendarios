@@ -83,24 +83,27 @@ public abstract class BlockDisplayMixin {
 	        String objRmv="scoreboard objectives remove jugadorPortalLegendarios";
 	        String randomPokemon=Ivolegendarios.POKEMON_LIST.get(Ivolegendarios.gen-1).get((int) (Math.random()*Ivolegendarios.POKEMON_LIST.get(Ivolegendarios.gen-1).size()));
 		    Ivolegendarios.LOGGER.info("SPAWNEANDO A "+randomPokemon);
-	        String summon="execute in server:void run pokespawnat "+Ivolegendarios.COORDS_SPAWN[0]+" "+Ivolegendarios.COORDS_SPAWN[1]+" "+Ivolegendarios.COORDS_SPAWN[2]+" "+randomPokemon+" lvl=50 no_ai";
+	        String[] summon={"execute in server:void run pokespawnat "+Ivolegendarios.COORDS_SPAWN[0]+" "+Ivolegendarios.COORDS_SPAWN[1]+" "+Ivolegendarios.COORDS_SPAWN[2]+" "+randomPokemon+" lvl=50 no_ai"};
 	        double random=Math.random()*Ivolegendarios.SHINY_RATE;
 	        if(Ivolegendarios.capturado) {
 	        	random=random/10;
 	        }
 	        if(random<=1) {
-	        	summon=summon+" shiny";
+	        	summon[0]=summon[0]+" shiny";
 	        }
+	        player.getServer().execute(() -> {
+
 	        showBossBar(player);
 	        String objSet="scoreboard players set "+player.getName().getLiteralString()+" jugadorPortalLegendarios 1";
 	        player.getServer().getCommandManager().executeWithPrefix(player.getServer().getCommandSource(), objRmv);
 	        player.getServer().getCommandManager().executeWithPrefix(player.getServer().getCommandSource(), objAdd);
 	        player.getServer().getCommandManager().executeWithPrefix(player.getServer().getCommandSource(), objSet);
 	        player.getServer().getCommandManager().executeWithPrefix(player.getServer().getCommandSource(), tp);
-	        player.getServer().getCommandManager().executeWithPrefix(player.getServer().getCommandSource(), summon);
+	        player.getServer().getCommandManager().executeWithPrefix(player.getServer().getCommandSource(), summon[0]);
 	    	spawnPortalVuelta(player);
 	        player.getServer().getCommandManager().executeWithPrefix(player.getServer().getCommandSource(), borrarStand);
 	        player.getServer().getCommandManager().executeWithPrefix(player.getServer().getCommandSource(), borrar);
+	    	});
             if (Ivolegendarios.scheduler != null && !Ivolegendarios.scheduler.isShutdown()) {
     	    	Ivolegendarios.scheduler.shutdownNow();
             }
