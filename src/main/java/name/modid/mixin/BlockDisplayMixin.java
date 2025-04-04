@@ -10,6 +10,8 @@ import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerChunkManager;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
@@ -40,7 +42,6 @@ public abstract class BlockDisplayMixin {
 	private static double lastX;
 	private static double lastY;
 	private static double lastZ;
-    private static boolean dentro = false;
 
     @Inject(method = "tick()V", at = @At("HEAD"))
     private void onEntityTick(CallbackInfo ci) {
@@ -70,18 +71,26 @@ public abstract class BlockDisplayMixin {
   }
 
     private void handlePlayerCollisionHoopa(PlayerEntity player) {
-    	if(!isDentro()) {
+    	if(!Ivolegendarios.isDentro()) {
 	    	this.lastX=this.getX();
 	    	this.lastY=this.getY();
 	    	this.lastZ=this.getZ();
-	    	setDentro(true);
+	    	Ivolegendarios.setDentro(true);
 	        String borrar="execute positioned "+this.getX()+" "+this.getY()+" "+this.getZ()+" run kill @e[type=minecraft:block_display,distance=..5]";
 	        String borrarStand="execute positioned "+this.getX()+" "+this.getY()+" "+this.getZ()+" run kill @e[type=minecraft:armor_stand,distance=..5]";
 	        Ivolegendarios.LOGGER.info("COORDS ISLA:"+" "+Ivolegendarios.COORDS_ISLA[0]+" "+Ivolegendarios.COORDS_ISLA[1]+" "+Ivolegendarios.COORDS_ISLA[2]);
 	        String tp="execute in server:void run tp "+player.getName().getLiteralString()+" "+Ivolegendarios.COORDS_ISLA[0]+" "+Ivolegendarios.COORDS_ISLA[1]+" "+(Ivolegendarios.COORDS_ISLA[2]-3)+" 180 0";
 	        String objAdd="scoreboard objectives add jugadorPortalLegendarios dummy";
 	        String objRmv="scoreboard objectives remove jugadorPortalLegendarios";
-	        String randomPokemon=Ivolegendarios.POKEMON_LIST.get(Ivolegendarios.gen-1).get((int) (Math.random()*Ivolegendarios.POKEMON_LIST.get(Ivolegendarios.gen-1).size()));
+	        int index = Ivolegendarios.gen - 1;
+	        String randomPokemon;
+	        if (index >= 0 && index < Ivolegendarios.POKEMON_LIST.size()) {
+	            List<String> pokemonList = Ivolegendarios.POKEMON_LIST.get(index);
+	            int randomIndex = (int) (Math.random() * pokemonList.size());
+	            randomPokemon = pokemonList.get(randomIndex);
+	        } else {
+	        	randomPokemon="rattata";
+	        }
 		    Ivolegendarios.LOGGER.info("SPAWNEANDO A "+randomPokemon);
 	        String[] summon={"execute in server:void run pokespawnat "+Ivolegendarios.COORDS_SPAWN[0]+" "+Ivolegendarios.COORDS_SPAWN[1]+" "+Ivolegendarios.COORDS_SPAWN[2]+" "+randomPokemon+" lvl=50 no_ai"};
 	        double random=Math.random()*Ivolegendarios.SHINY_RATE;
@@ -103,6 +112,19 @@ public abstract class BlockDisplayMixin {
 	    	spawnPortalVuelta(player);
 	        player.getServer().getCommandManager().executeWithPrefix(player.getServer().getCommandSource(), borrarStand);
 	        player.getServer().getCommandManager().executeWithPrefix(player.getServer().getCommandSource(), borrar);
+	        
+	        
+		    //FORZAR DESCARGA DE CHUNK
+	        ServerWorld overworld = player.getServer().getOverworld();
+	        ServerChunkManager chunkManager = overworld.getChunkManager();
+	        int chunkX = MathHelper.floor(this.getX()) >> 4;
+	        int chunkZ = MathHelper.floor(this.getZ()) >> 4;
+	        ChunkPos chunkPos = new ChunkPos(chunkX, chunkZ);
+            chunkManager.setChunkForced(chunkPos, false);
+            chunkManager.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
+            ////////////////////////////////////
+	        
+	        
 	    	});
             if (Ivolegendarios.scheduler != null && !Ivolegendarios.scheduler.isShutdown()) {
     	    	Ivolegendarios.scheduler.shutdownNow();
@@ -115,9 +137,8 @@ public abstract class BlockDisplayMixin {
     }
     
     private void handlePlayerCollisionHoopaVuelta(PlayerEntity player) {
-    	if(isDentro()) {
+    	if(Ivolegendarios.isDentro()) {
     	    Ivolegendarios.LOGGER.info("TP VUELTA");
-	    	BlockPos blockPos = new BlockPos((int) Ivolegendarios.COORDS_SPAWN[0], (int) 319, (int) Ivolegendarios.COORDS_SPAWN[2]);
 		    int chunkX = MathHelper.floor(Ivolegendarios.COORDS_SPAWN[0]) >> 4;
 		    int chunkZ = MathHelper.floor(Ivolegendarios.COORDS_SPAWN[2]) >> 4;
 	        String tp="execute in server:void run execute positioned "+Ivolegendarios.COORDS_ISLA[0]+" "+Ivolegendarios.COORDS_ISLA[1]+" "+Ivolegendarios.COORDS_ISLA[2]+" run execute as @a[distance=..100] run execute in minecraft:overworld run tp @s "+this.lastX+" "+(this.lastY-25)+" "+this.lastZ;
@@ -143,7 +164,7 @@ public abstract class BlockDisplayMixin {
 		    int chunkXOw = MathHelper.floor(this.lastX)>> 4;
 		    int chunkZOw = MathHelper.floor(this.lastZ) >> 4;		    
 		    player.getServer().getOverworld().getChunkManager().getChunk(chunkXOw, chunkZOw, ChunkStatus.FULL, false);
-	        setDentro(false);
+	        Ivolegendarios.setDentro(false);
             if (Ivolegendarios.scheduler != null && !Ivolegendarios.scheduler.isShutdown()) {
     	    	Ivolegendarios.scheduler.shutdownNow();
             }
@@ -195,7 +216,7 @@ public abstract class BlockDisplayMixin {
 	    }
 	    while(ELAPSED_SECONDS[0]< TOTAL_SECONDS) {
 	    	Ivolegendarios.scheduler.schedule(() -> {
-	    		if(dentro) {
+	    		if(Ivolegendarios.isDentro()) {
 	    			float progress = 1.0f - ((float) ELAPSED_SECONDS[0]/ TOTAL_SECONDS);
 	    			bossBar.setPercent(progress);
 	
@@ -207,16 +228,6 @@ public abstract class BlockDisplayMixin {
 	        }
 	    }
 	}
-
-    private static synchronized boolean isDentro() {
-        Ivolegendarios.LOGGER.info("Valor actual de 'dentro': " + dentro);
-        return dentro;
-    }
-
-    private static synchronized  void setDentro(boolean value) {
-        Ivolegendarios.LOGGER.info("Estableciendo 'dentro' a: " + value);
-        dentro = value;
-    }
     @Shadow
     protected abstract void writeCustomDataToNbt(NbtCompound nbt);
     @Shadow

@@ -7,6 +7,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.scoreboard.ReadableScoreboardScore;
 import net.minecraft.scoreboard.Scoreboard;
@@ -15,23 +16,29 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ChunkTicketType;
+import net.minecraft.server.world.ServerChunkManager;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.Heightmap;
+import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkStatus;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import net.minecraft.command.argument.EntityArgumentType;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.decoration.ArmorStandEntity;
-
+import net.minecraft.entity.decoration.DisplayEntity.BlockDisplayEntity;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.MathHelper;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
@@ -43,7 +50,6 @@ import static net.minecraft.server.command.CommandManager.literal;
 
 import java.io.*;
 import java.nio.file.Path;
-import java.util.List;
 
 public class Ivolegendarios implements ModInitializer {
 	public static final String MOD_ID = "ivolegendarios";
@@ -80,6 +86,7 @@ public class Ivolegendarios implements ModInitializer {
 	public static long PORTAL_DURATION_INTERVAL = 3 * 60;	
 	public static int[] COORDS_ISLA;
 	public static int[] COORDS_SPAWN;
+    private static boolean dentro = false;
 
 		@Override
 	public void onInitialize() {
@@ -386,7 +393,6 @@ public class Ivolegendarios implements ModInitializer {
 		}
 	}
 	public static void spawnTry(MinecraftServer server) {
-    	LOGGER.info("SPAWN TRY");
 		if (server != null) {
 			if (Math.random()*100 <= SPAWN_RATE) {
 				spawnPortal(server,null);
@@ -412,15 +418,12 @@ public class Ivolegendarios implements ModInitializer {
 					int trys=0;
 					// Select a random player
 					ServerPlayerEntity randomPlayer = null;
-	    	        LOGGER.info("PRE WHILE");
 	                ServerCommandSource consoleSource = server.getCommandSource();
 					double offsetX;
 					double offsetZ;
 	                if(player==null) {
 						while(trys<(playerList.size()*(SPAWN_TRYS/100)) && pokedexGen==0) {
-			    	        LOGGER.info("TRY:"+trys+1);
 			    	        LOGGER.info("COMPROBANDO GEN: "+gen);
-			    	        LOGGER.info("COMPROBANDO INTERVALO: "+intervalos[gen-1][0]+"-"+intervalos[gen-1][1]);
 							randomPlayer = playerList.get(random.nextInt(playerList.size()));
 			                String command1 = String.format("scoreboard players set "+randomPlayer.getName().getLiteralString()+" testPokedex 0");
 			    	        //String command2 = "execute as "+randomPlayer.getName().toString()+" run ivopokedex intervalo "+intervalos[gen][0]+" "+intervalos[gen][1];
@@ -446,9 +449,7 @@ public class Ivolegendarios implements ModInitializer {
 	                }
 					offsetX=offsetX+Math.copySign(10, offsetX);
 					offsetZ=offsetZ+Math.copySign(10, offsetZ);
-			    	LOGGER.info("POKEDEXGEN="+pokedexGen+" playernull="+(randomPlayer==null));
-					if(randomPlayer!=null && pokedexGen==1) {
-						
+					if(randomPlayer!=null && pokedexGen==1) {						
 		                String command3 ="execute as "+randomPlayer.getName().getLiteralString()+" run ivopokedex intervalo "+intervalos[gen-1][0]+" "+intervalos[gen-1][1]+"";
 		                String command4 = String.format("scoreboard players set "+randomPlayer.getName().getLiteralString()+" testPokedex 0");
 		    	        server.getCommandManager().executeWithPrefix(consoleSource, command4);
@@ -472,20 +473,17 @@ public class Ivolegendarios implements ModInitializer {
 						double newZ = playerPos.z + offsetZ;
 					    int chunkX = MathHelper.floor(newX) >> 4;
 					    int chunkZ = MathHelper.floor(newZ) >> 4;
-					    
 					    server.getOverworld().getChunkManager().getChunk(chunkX, chunkZ, ChunkStatus.FULL, true);
-		    	        LOGGER.info("PRE BLOCKPOS");
-						BlockPos blockPos = new BlockPos((int) newX, (int) 319, (int) newZ);
-						
+					   	BlockPos blockPos = new BlockPos((int) newX, (int) 319, (int) newZ);
+					   	
 						int groundLevelY = Objects.requireNonNull(server.getWorld(randomPlayer.getWorld().getRegistryKey()))
 							    .getTopPosition(Heightmap.Type.WORLD_SURFACE, blockPos).getY();
 					    server.execute(() -> {
 					    	
-							double newY = groundLevelY + 25;
-							LOGGER.info("SPAWNMESSAGE");		
-												
-							String comandoPortal="summon block_display "+newX+" "+newY+" "+newZ+" {Passengers:[{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[1.875f,0f,0f,-1.7624f,0f,0.5133f,0f,1.6092f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[1.8111121335f,0.1197111713f,0f,-1.7606f,-0.4852547164f,0.446797007f,0f,2.1191f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[1.6237702106f,0.2389868482f,0f,-1.6405f,-0.9375515948f,0.413907594f,0f,2.5634f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[1.3258f,0.3434f,0f,-1.4029f,-1.3258f,0.3434f,0f,2.9752f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[0.9375967492f,0.4206144708f,0f,-1.0615f,-1.6237441368f,0.2428749404f,0f,3.3158f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[0.4852793964f,0.4627985893f,0f,-0.6409f,-1.8111055207f,0.124005265f,0f,3.5583f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[0f,0.4791f,0f,-0.1789f,-1.875f,0f,0f,3.6821f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[-0.4852547149f,0.4467970068f,0f,0.2973f,-1.8111121329f,-0.119711171f,0f,3.682f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[-1.3258f,0.3434f,0f,1.1533f,-1.3258f,-0.3434f,0f,3.3244f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[-1.6237441368f,0.2428749393f,0f,1.4939f,-0.9375967447f,-0.4206144708f,0f,2.983f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[-1.8111055207f,0.124005265f,0f,1.7364f,-0.4852793962f,-0.4627985893f,0f,2.5623f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[-1.875f,0f,0f,1.8603f,0f,-0.4791f,0f,2.1004f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[-1.8111121329f,-0.1197111713f,0f,1.8599f,0.4852547164f,-0.4467970068f,0f,1.6256f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[-1.6237702096f,-0.2389868482f,0f,1.7398f,0.9375515948f,-0.4139075937f,0f,1.1813f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[-1.3258f,-0.3434f,0f,1.5022f,1.3258f,-0.3434f,0f,0.7696f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[-0.9375967447f,-0.4206144708f,0f,1.1608f,1.6237441368f,-0.2428749393f,0f,0.429f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[-0.4852793959f,-0.4627985893f,0f,0.7402f,1.8111055207f,-0.1240052649f,0f,0.1865f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[0f,-0.4791f,0f,0.2782f,1.875f,0f,0f,0.0626f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[0.4852547174f,-0.4467970068f,0f,-0.204f,1.8111121329f,0.1197111716f,0f,0.0643f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[0.9375515961f,-0.4139075937f,0f,-0.6483f,1.6237702096f,0.2389868485f,0f,0.1843f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[1.3258f,-0.3434f,0f,-1.0601f,1.3258f,0.3434f,0f,0.4219f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[1.6237441404f,-0.2428749393f,0f,-1.4007f,0.9375967447f,0.4206144717f,0f,0.7633f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[1.8111055208f,-0.124005265f,0f,-1.6432f,0.4852793962f,0.4627985893f,0f,1.184f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[-0.9375515948f,0.4139075937f,0f,0.7415f,-1.6237702096f,-0.2389868482f,0f,3.562f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.5f,0f,0f,-0.1875f,0f,0.1875f,0f,3.6875f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.5370547594f,-0.048528571f,0f,-0.67f,0.1439033891f,0.1811110924f,0f,3.553125f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.4815101245f,-0.09375f,0f,-1.08f,0.278f,0.1623797632f,0f,3.3025f,0f,0f,0.1875f,-0.05875f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.3931513703f,-0.1325825215f,0f,-1.4375f,0.3931513703f,0.1325825215f,0f,2.9375f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0f,-0.1875f,0f,-1.75f,0.5f,0f,0f,1.625f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.5370547594f,-0.048528571f,0f,-0.67f,0.1439033891f,0.1811110924f,0f,3.553125f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.278f,-0.1623797632f,0f,-1.683125f,0.4815101245f,0.09375f,0f,2.5f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.1330015267f,-0.1820564092f,0f,-1.76125f,0.5398579386f,0.0448521336f,0f,2.068125f,0f,0f,0.1875f,-0.061875f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.5f,0f,0f,-0.1875f,0f,0.1875f,0f,-0.125f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0f,-0.1875f,0f,2.036875f,0.5f,0f,0f,1.625f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.5370547594f,0.048528571f,0f,0.25f,-0.1439033891f,0.1811110924f,0f,3.696875f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.4815101245f,0.09375f,0f,0.715625f,-0.278f,0.1623797632f,0f,3.580625f,0f,0f,0.1875f,-0.05875f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.3931513703f,0.1325825215f,0f,1.16125f,-0.3931513703f,0.1325825215f,0f,3.330625f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.278f,0.1623797632f,0f,1.521875f,-0.4815101245f,0.09375f,0f,2.98125f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.1330015267f,0.1820564092f,0f,1.745f,-0.5398579386f,0.0448521336f,0f,2.608125f,0f,0f,0.1875f,-0.061875f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.5370547594f,0.048528571f,0f,-0.71875f,-0.1439033891f,0.1811110924f,0f,0f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.4815101245f,0.09375f,0f,-1.17375f,-0.278f,0.1623797632f,0f,0.269375f,0f,0f,0.1875f,-0.05875f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.3931513703f,0.1325825215f,0f,-1.57f,-0.3931513703f,0.1325825215f,0f,0.664375f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.278f,0.1623797632f,0f,-1.845625f,-0.4815101245f,0.09375f,0f,1.140625f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.1330015267f,0.1820564092f,0f,-1.943125f,-0.5398579386f,0.0448521336f,0f,1.62125f,0f,0f,0.1875f,-0.061875f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.5370547594f,-0.048528571f,0f,0.29875f,0.1439033891f,0.1811110924f,0f,-0.14375f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.4815101245f,-0.09375f,0f,0.809375f,0.278f,0.1623797632f,0f,-0.00875f,0f,0f,0.1875f,-0.05875f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.3931513703f,-0.1325825215f,0f,1.29375f,0.3931513703f,0.1325825215f,0f,0.27125f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.278f,-0.1623797632f,0f,1.684375f,0.4815101245f,0.09375f,0f,0.659375f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.1330015267f,-0.1820564092f,0f,1.926875f,0.5398579386f,0.0448521336f,0f,1.08125f,0f,0f,0.1875f,-0.061875f,0f,0f,0f,1f]}],Tags:[\"PortalHoopa\"]}";
+							double newY = groundLevelY + 25;												
 							ArmorStandEntity stand = new ArmorStandEntity(server.getOverworld(), newX, newY, newZ);
+		    	            BlockDisplayEntity portalDisplay[] = {null};
+
 						    stand.setInvisible(true);     // hacerlo invisible
 						    stand.setInvulnerable(true);    // para que no se destruya fácilmente
 						    stand.setNoGravity(true);       // sin gravedad (opcional)
@@ -493,20 +491,50 @@ public class Ivolegendarios implements ModInitializer {
 						    stand.setCustomNameVisible(false);
 						    Box box = new Box(newX - 2, newY -2, newZ, newX + 2, newY + 2, newZ + 1);
 						    stand.setBoundingBox(box);
+						    
+						    //FORZAR CARGA DE CHUNK
+					        ServerWorld overworld = server.getOverworld();
+					        ServerChunkManager chunkManager = overworld.getChunkManager();
+					        ChunkPos chunkPos = new ChunkPos(chunkX, chunkZ);
+			                chunkManager.setChunkForced(chunkPos, true);
+			                chunkManager.getChunk(chunkX, chunkZ, ChunkStatus.FULL, true);
+			                ////////////////////////////////////
+
+			                
 					    	server.getOverworld().spawnEntity(stand);
-					    	LOGGER.info("SPAWN STAND");
+							String comandoPortal="summon block_display "+newX+" "+newY+" "+newZ+" {Passengers:[{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[1.875f,0f,0f,-1.7624f,0f,0.5133f,0f,1.6092f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[1.8111121335f,0.1197111713f,0f,-1.7606f,-0.4852547164f,0.446797007f,0f,2.1191f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[1.6237702106f,0.2389868482f,0f,-1.6405f,-0.9375515948f,0.413907594f,0f,2.5634f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[1.3258f,0.3434f,0f,-1.4029f,-1.3258f,0.3434f,0f,2.9752f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[0.9375967492f,0.4206144708f,0f,-1.0615f,-1.6237441368f,0.2428749404f,0f,3.3158f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[0.4852793964f,0.4627985893f,0f,-0.6409f,-1.8111055207f,0.124005265f,0f,3.5583f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[0f,0.4791f,0f,-0.1789f,-1.875f,0f,0f,3.6821f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[-0.4852547149f,0.4467970068f,0f,0.2973f,-1.8111121329f,-0.119711171f,0f,3.682f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[-1.3258f,0.3434f,0f,1.1533f,-1.3258f,-0.3434f,0f,3.3244f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[-1.6237441368f,0.2428749393f,0f,1.4939f,-0.9375967447f,-0.4206144708f,0f,2.983f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[-1.8111055207f,0.124005265f,0f,1.7364f,-0.4852793962f,-0.4627985893f,0f,2.5623f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[-1.875f,0f,0f,1.8603f,0f,-0.4791f,0f,2.1004f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[-1.8111121329f,-0.1197111713f,0f,1.8599f,0.4852547164f,-0.4467970068f,0f,1.6256f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[-1.6237702096f,-0.2389868482f,0f,1.7398f,0.9375515948f,-0.4139075937f,0f,1.1813f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[-1.3258f,-0.3434f,0f,1.5022f,1.3258f,-0.3434f,0f,0.7696f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[-0.9375967447f,-0.4206144708f,0f,1.1608f,1.6237441368f,-0.2428749393f,0f,0.429f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[-0.4852793959f,-0.4627985893f,0f,0.7402f,1.8111055207f,-0.1240052649f,0f,0.1865f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[0f,-0.4791f,0f,0.2782f,1.875f,0f,0f,0.0626f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[0.4852547174f,-0.4467970068f,0f,-0.204f,1.8111121329f,0.1197111716f,0f,0.0643f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[0.9375515961f,-0.4139075937f,0f,-0.6483f,1.6237702096f,0.2389868485f,0f,0.1843f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[1.3258f,-0.3434f,0f,-1.0601f,1.3258f,0.3434f,0f,0.4219f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[1.6237441404f,-0.2428749393f,0f,-1.4007f,0.9375967447f,0.4206144717f,0f,0.7633f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[1.8111055208f,-0.124005265f,0f,-1.6432f,0.4852793962f,0.4627985893f,0f,1.184f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:nether_portal\",Properties:{axis:\"x\"}},transformation:[-0.9375515948f,0.4139075937f,0f,0.7415f,-1.6237702096f,-0.2389868482f,0f,3.562f,0f,0f,0.0547f,0f,0f,0f,0f,1f],brightness:{sky:15,block:12}},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.5f,0f,0f,-0.1875f,0f,0.1875f,0f,3.6875f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.5370547594f,-0.048528571f,0f,-0.67f,0.1439033891f,0.1811110924f,0f,3.553125f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.4815101245f,-0.09375f,0f,-1.08f,0.278f,0.1623797632f,0f,3.3025f,0f,0f,0.1875f,-0.05875f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.3931513703f,-0.1325825215f,0f,-1.4375f,0.3931513703f,0.1325825215f,0f,2.9375f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0f,-0.1875f,0f,-1.75f,0.5f,0f,0f,1.625f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.5370547594f,-0.048528571f,0f,-0.67f,0.1439033891f,0.1811110924f,0f,3.553125f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.278f,-0.1623797632f,0f,-1.683125f,0.4815101245f,0.09375f,0f,2.5f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.1330015267f,-0.1820564092f,0f,-1.76125f,0.5398579386f,0.0448521336f,0f,2.068125f,0f,0f,0.1875f,-0.061875f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.5f,0f,0f,-0.1875f,0f,0.1875f,0f,-0.125f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0f,-0.1875f,0f,2.036875f,0.5f,0f,0f,1.625f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.5370547594f,0.048528571f,0f,0.25f,-0.1439033891f,0.1811110924f,0f,3.696875f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.4815101245f,0.09375f,0f,0.715625f,-0.278f,0.1623797632f,0f,3.580625f,0f,0f,0.1875f,-0.05875f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.3931513703f,0.1325825215f,0f,1.16125f,-0.3931513703f,0.1325825215f,0f,3.330625f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.278f,0.1623797632f,0f,1.521875f,-0.4815101245f,0.09375f,0f,2.98125f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.1330015267f,0.1820564092f,0f,1.745f,-0.5398579386f,0.0448521336f,0f,2.608125f,0f,0f,0.1875f,-0.061875f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.5370547594f,0.048528571f,0f,-0.71875f,-0.1439033891f,0.1811110924f,0f,0f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.4815101245f,0.09375f,0f,-1.17375f,-0.278f,0.1623797632f,0f,0.269375f,0f,0f,0.1875f,-0.05875f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.3931513703f,0.1325825215f,0f,-1.57f,-0.3931513703f,0.1325825215f,0f,0.664375f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.278f,0.1623797632f,0f,-1.845625f,-0.4815101245f,0.09375f,0f,1.140625f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.1330015267f,0.1820564092f,0f,-1.943125f,-0.5398579386f,0.0448521336f,0f,1.62125f,0f,0f,0.1875f,-0.061875f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.5370547594f,-0.048528571f,0f,0.29875f,0.1439033891f,0.1811110924f,0f,-0.14375f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.4815101245f,-0.09375f,0f,0.809375f,0.278f,0.1623797632f,0f,-0.00875f,0f,0f,0.1875f,-0.05875f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.3931513703f,-0.1325825215f,0f,1.29375f,0.3931513703f,0.1325825215f,0f,0.27125f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.278f,-0.1623797632f,0f,1.684375f,0.4815101245f,0.09375f,0f,0.659375f,0f,0f,0.1875f,-0.0625f,0f,0f,0f,1f]},{id:\"minecraft:block_display\",block_state:{Name:\"minecraft:gold_block\",Properties:{}},transformation:[0.1330015267f,-0.1820564092f,0f,1.926875f,0.5398579386f,0.0448521336f,0f,1.08125f,0f,0f,0.1875f,-0.061875f,0f,0f,0f,1f]}],Tags:[\"PortalHoopa\"]}";
 					    	server.getCommandManager().executeWithPrefix(server.getCommandSource(), comandoPortal);
 					    	LOGGER.info("SPAWN PORTAL");
-							String spawnMessage ="tellraw @a [{\"text\":\"\"},{\"text\":\"\\nSe ha avistado un portal cerca de [\",\"bold\":true,\"italic\":true,\"color\":\"yellow\"},{\"text\":\""+Math.round(newX)+"\",\"bold\":true,\"italic\":true,\"color\":\"dark_purple\"},{\"text\":\"] [\",\"bold\":true,\"italic\":true,\"color\":\"yellow\"},{\"text\":\""+Math.round(newZ)+"\",\"bold\":true,\"italic\":true,\"color\":\"dark_purple\"},{\"text\":\"]\\n\",\"bold\":true,\"italic\":true,\"color\":\"yellow\"}]";
-			    	        server.getCommandManager().executeWithPrefix(server.getCommandSource(), spawnMessage);		
+			    	        Box searchArea = new Box(newX - 5, newY - 5, newZ - 5, newX + 5, newY + 5, newZ + 5);
+			    	        Collection<BlockDisplayEntity> displays = server.getOverworld().getEntitiesByClass(
+			    	        	    BlockDisplayEntity.class,
+			    	        	    searchArea,
+			    	        	    entity -> entity.getCommandTags().contains("PortalHoopa")
+			    	        	);
+
+			    	        if (!displays.isEmpty()) {
+			    	            portalDisplay[0] = displays.iterator().next();
+			    	        }
+
 					    	if (scheduler != null && !scheduler.isShutdown()) {
 					    		scheduler.shutdownNow();
 					    	}
+							String spawnMessage ="tellraw @a [{\"text\":\"\"},{\"text\":\"\\nSe ha avistado un portal cerca de [\",\"bold\":true,\"italic\":true,\"color\":\"yellow\"},{\"text\":\""+Math.round(newX)+"\",\"bold\":true,\"italic\":true,\"color\":\"dark_purple\"},{\"text\":\"] [\",\"bold\":true,\"italic\":true,\"color\":\"yellow\"},{\"text\":\""+Math.round(newZ)+"\",\"bold\":true,\"italic\":true,\"color\":\"dark_purple\"},{\"text\":\"]\\n\",\"bold\":true,\"italic\":true,\"color\":\"yellow\"}]";
+			    	        server.getCommandManager().executeWithPrefix(server.getCommandSource(), spawnMessage);		
+
 					    	scheduler = Executors.newSingleThreadScheduledExecutor();
 					    	scheduler.schedule(() -> {
-					    		killPortal(server,newX,newY,newZ);
-						    	server.getOverworld().getChunkManager().getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
-					    	}, 3, TimeUnit.MINUTES);
+						    	if(!isDentro()) {
+					    	        ChunkPos pos = new ChunkPos(chunkX, chunkZ);
+				    	            server.getOverworld().getChunkManager().addTicket(ChunkTicketType.PLAYER, pos, 16, pos);
+				    	            server.getOverworld().getChunkManager().getChunk(chunkX, chunkZ, ChunkStatus.FULL, true);
+					    	        server.execute(() -> {
+					    	            killPortal(server, newX, newY, newZ, stand, portalDisplay[0]);
+					    	            server.getOverworld().getChunkManager().removeTicket(ChunkTicketType.PLAYER, pos, 16, pos);
+
+					    	        });
+						    	}
+					    	}, 180, TimeUnit.SECONDS);
 					    });
 					}
 					else {
@@ -522,24 +550,66 @@ public class Ivolegendarios implements ModInitializer {
 			}
 		}
 	}
-	public static void killPortal(MinecraftServer server, double x,double y,double z) {
-		server.execute(() -> {
-	    int chunkX = MathHelper.floor(x) >> 4;
-	    int chunkZ = MathHelper.floor(z) >> 4;
-	    server.getOverworld().getChunkManager().getChunk(chunkX, chunkZ, ChunkStatus.FULL, true);
-        String borrar="execute positioned "+x+" "+y+" "+z+" run kill @e[type=minecraft:block_display,distance=..5]";
-        String borrarStand="execute positioned "+x+" "+y+" "+z+" run kill @e[type=minecraft:armor_stand,distance=..5]";
-        server.getCommandManager().executeWithPrefix(server.getCommandSource(), borrar);
-        server.getCommandManager().executeWithPrefix(server.getCommandSource(), borrarStand);
-	    server.getOverworld().getChunkManager().getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
-        if (scheduler != null && !scheduler.isShutdown()) {
-            scheduler.shutdownNow();
-        }
-        scheduler = Executors.newSingleThreadScheduledExecutor();
-        scheduler.schedule(() -> {
-        	spawnTry(server);
-        }, TIME_INTERVAL, TimeUnit.SECONDS);
-		});
+	public static void killPortal(MinecraftServer server, double x, double y, double z, ArmorStandEntity stand, BlockDisplayEntity bdisplay) {
+	    server.execute(() -> {
+	        int chunkX = MathHelper.floor(x) >> 4;
+	        int chunkZ = MathHelper.floor(z) >> 4;
+	        ServerWorld overworld = server.getOverworld();
+	        ServerChunkManager chunkManager = overworld.getChunkManager();
+	        ChunkPos chunkPos = new ChunkPos(chunkX, chunkZ);
+	        
+	        // Forzamos la carga del chunk
+	        chunkManager.setChunkForced(chunkPos, true);
+	        Chunk chunk = chunkManager.getChunk(chunkX, chunkZ, ChunkStatus.FULL, true);
+	        
+	        if (chunk == null) {
+	            // Si aún no se pudo cargar, reintenta en 100ms
+	            scheduler.schedule(() -> {
+	                server.execute(() -> {
+	                    killPortal(server, x, y, z, stand, bdisplay);
+	                });
+	            }, 100, TimeUnit.MILLISECONDS);
+	            return;
+	        }
+	        
+	        scheduler.schedule(() -> {
+	            server.execute(() -> {
+	                // Reforzamos nuevamente la carga en caso de ser necesario
+	                chunkManager.setChunkForced(chunkPos, true);
+	                chunkManager.getChunk(chunkX, chunkZ, ChunkStatus.FULL, true);
+	                
+	                String cmdBlockDisplay = "execute positioned " + x + " " + y + " " + z + " run kill @e[type=minecraft:block_display,distance=..7]";
+	                String cmdArmorStand = "execute positioned " + x + " " + y + " " + z + " run kill @e[type=minecraft:armor_stand,distance=..7]";
+	                LOGGER.warn(cmdBlockDisplay);
+	                server.getCommandManager().executeWithPrefix(server.getCommandSource(), cmdBlockDisplay);
+	                server.getCommandManager().executeWithPrefix(server.getCommandSource(), cmdArmorStand);
+	                stand.tick();
+	                bdisplay.tick();
+					LOGGER.info("Stand(Portal) despawneado en: "+stand.getBlockPos().toString());
+					LOGGER.info("BlockDisplay(Portal) despawneado en: "+bdisplay.getBlockPos().toString());
+	                String despawnMessage = "tellraw @a [{\"text\":\"\"},{\"text\":\"\\nEl portal ha desaparecido...\",\"bold\":true,\"italic\":true,\"color\":\"yellow\"}]";
+	                server.getCommandManager().executeWithPrefix(server.getCommandSource(), despawnMessage);
+	                chunkManager.setChunkForced(chunkPos, false);
+	                chunkManager.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
+	                
+	                if (scheduler != null && !scheduler.isShutdown()) {
+	                    scheduler.shutdownNow();
+	                }
+	                scheduler = Executors.newSingleThreadScheduledExecutor();
+	                scheduler.schedule(() -> server.execute(() -> spawnTry(server)), TIME_INTERVAL, TimeUnit.SECONDS);
+	            });
+	        }, 2, TimeUnit.SECONDS);
+	    });
+	}
+
+
+
+	public static boolean isDentro() {
+		return dentro;
+	}
+
+	public static void setDentro(boolean dentro) {
+		Ivolegendarios.dentro = dentro;
 	}
 
 	
